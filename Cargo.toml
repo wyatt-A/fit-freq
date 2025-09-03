@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+array-lib = {git = "https://git@github.com/wyatt-A/array-lib.git", features = ["io-nrrd"]}
+bytemuck = "1.23.2"
+clap = { version = "4.5.47", features = ["derive"] }
 num-complex = "0.4.6"
-num-traits = "0.2.19"
 rayon = "1.11.0"

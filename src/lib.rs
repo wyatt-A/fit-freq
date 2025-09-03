@@ -32,8 +32,7 @@ mod tests {
         }).collect();
 
         // perform initial fit
-        let mut fit = [0.,0.];
-        fit_init(&m, &mut fit);
+        let mut fit = fit_init(&m);
 
         println!("init fit: {:?}",fit);
 
@@ -63,15 +62,17 @@ pub fn fit_freq(img:&[Complex32], dims:&[usize], tol:f32, max_iter:usize) -> (Ve
 
     assert_eq!(dims.len(), 4, "input must be 4 dimensional");
     let n_echoes = dims[3];
+    assert!(n_echoes >= 3, "input must have at least 3 echoes");
     let n_vox:usize = dims[0..3].iter().product();
 
     let mut fit = vec![0f32;n_vox];
     let mut err = vec![0f32;n_vox];
 
-    let vols:Vec<&[Complex32]> = img.chunks_exact(n_echoes).collect();
+    let vols:Vec<&[Complex32]> = img.chunks_exact(n_vox).collect();
 
     fit.par_iter_mut().zip(err.par_iter_mut()).enumerate().for_each(|(i,(fit,err))|{
 
+        //println!("i = {i}");
         let mut w = vec![Complex32::ZERO;n_echoes];
         let mut r = vec![Complex32::ZERO;n_echoes];
         let mut m = vec![Complex32::ZERO;n_echoes];
@@ -101,9 +102,9 @@ fn gauss_newton(m:&[Complex32], inv_mat_entries:&[f32], w:&mut [Complex32], r:&m
     let mut p0 = coeffs[0];
     let mut p1 = coeffs[1];
 
-    loop {
+    //println!("m = {:?}",m);
 
-        println!("{}",loop_count);
+    loop {
 
         // update the solution w
         w.iter_mut().zip(m.iter()).enumerate().for_each(|(k,(w,m))|{
@@ -113,7 +114,6 @@ fn gauss_newton(m:&[Complex32], inv_mat_entries:&[f32], w:&mut [Complex32], r:&m
         // update the residual
         r.iter_mut().zip(w.iter().zip(m.iter())).for_each(|(r,(&w,&m))| *r = m - w);
 
-
         // update right-hand side variables
         let pr1:Complex32 = w.iter().zip(r.iter()).map(|(w,&r)|{
             (Complex32::i() * w).conj() * r
@@ -122,8 +122,6 @@ fn gauss_newton(m:&[Complex32], inv_mat_entries:&[f32], w:&mut [Complex32], r:&m
         let pr2:Complex32 = w.iter().zip(r.iter()).enumerate().map(|(k,(w,&r))|{
             (Complex32::i() * w).conj() * r * k as f32
         }).sum();
-
-        println!("pr2 = {}",pr2);
 
         // solve for the updates
         let dp0 = (ai11 * pr1 + ai12 * pr2).re;
@@ -159,7 +157,8 @@ fn inverse_normal_matrix(m:&[Complex32]) -> [f32;3] {
     let a12:f32 = m.iter().enumerate().map(|(k,x)| x.norm_sqr() * k as f32).sum();
     let a22:f32 = m.iter().enumerate().map(|(k,x)| x.norm_sqr() * k.pow(2) as f32).sum();
 
-    let det = 1./(a11 * a22 - a12 * a12);
+    let d = a11 * a22 - a12 * a12;
+    let det = 1./d;
 
     let ai11 = det * a22;
     let ai12 = -det * a12;
